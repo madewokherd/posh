@@ -146,7 +146,8 @@ fn is a function taking no arguments and returning a string."""
 
 setps1(lambda: f'{user}@{hostname}:{pwd()} >>> ')
 
-parent = Path('..')
+parent = Path(os.pardir)
+curdir = Path(os.curdir)
 root = Path('/')
 home = Path(os.path.expanduser('~'))
 devnull = Path(os.devnull)
