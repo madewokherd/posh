@@ -46,6 +46,11 @@ class _TrapSignals:
         if _have_termios and self.prev_tcattr:
             termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, self.prev_tcattr)
 
+command_defaults = {
+    'git': {'_switch_index': 2},
+    'stty': {'_path_safety': False},
+}
+
 class Command:
     """Object representing a command that can be executed by creating a new process
 
@@ -133,7 +138,7 @@ _switch_index -- Index in the argument list where switches are inserted. Default
 
 class CommandSearcher:
     def find(self, name):
-        return Command(which(name))
+        return Command(which(name), **command_defaults.get(name, {}))
 
     def __getattr__(self, name):
         return self.find(name)
