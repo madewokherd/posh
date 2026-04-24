@@ -42,6 +42,7 @@ setps1(lambda: f'{user}@{hostname}:{pwd()} >>> ')
 parent = Path('..')
 root = Path('/')
 home = Path(os.path.expanduser('~'))
+devnull = Path(os.devnull)
 
 cd = os.chdir
 
