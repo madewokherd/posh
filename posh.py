@@ -31,10 +31,13 @@ def _raise_quit(signum, frame):
     raise QuitSignal()
 
 class _TrapSignals:
+    def __init__(self, skip_termios):
+        self.skip_termios = skip_termios
+
     def __enter__(self):
         if os.name != 'nt':
             self.prev_quit = signal.signal(signal.SIGQUIT, _raise_quit)
-        if _have_termios:
+        if _have_termios and not self.skip_termios:
             try:
                 self.prev_tcattr = termios.tcgetattr(sys.stdin)
             except termios.error:
@@ -43,12 +46,14 @@ class _TrapSignals:
     def __exit__(self, exc_type, exc_value, exc_traceback):
         if os.name != 'nt':
             signal.signal(signal.SIGQUIT, self.prev_quit)
-        if _have_termios and self.prev_tcattr:
+        if _have_termios and not self.skip_termios and self.prev_tcattr:
             termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, self.prev_tcattr)
 
 command_defaults = {
     'git': {'_switch_index': 2},
+    'reset': {'_allow_termios': True},
     'stty': {'_path_safety': False},
+    'tset': {'_allow_termios': True},
 }
 
 class Command:
@@ -62,6 +67,7 @@ Single character keyword arguments are translated to short switches. For example
 Lowercase keyword arguments are translated to long options, with underscores replaced by hyphens. For example "git push --force-with-lease" can be expressed as cmd.git('push', force_with_lease=True). If a value other than True is used, it will be converted to a string and passed as a value. If the switch uses underscores instead of hyphens, this can be expressed by ending the argument with a hyphen, for example "silly_command --why_underscores" can be expressed as cmd.silly_command(why_underscores_=True).
 
 Special keyword arguments:
+_allow_termios -- Do not save and restore tty attributes when running this command.
 _argv -- Specifies the *entire* argument list, including the command name, which will be used without modification.
 _path_safety -- If True, arguments starting with - will be prefixed with the current directory to prevent relative paths from being erroneously interpreted as switches. On Windows, arguments starting with / will also be prefixed. Defaults to True.
 _switch_index -- Index in the argument list where switches are inserted. Defaults to 1.
@@ -127,7 +133,7 @@ _switch_index -- Index in the argument list where switches are inserted. Default
                         else:
                             argv.insert(switch_index, f'--{converted_name}={v}')
                         switch_index += 1
-        with _TrapSignals():
+        with _TrapSignals(skip_termios=self.kwargs.get('_allow_termios', False)):
             popen = subprocess.Popen(argv)
             retval = popen.wait()
         if retval:
