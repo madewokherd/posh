@@ -4,6 +4,7 @@ import os.path
 import pathlib
 import signal
 import socket
+import string
 import subprocess
 import sys
 try:
@@ -151,6 +152,16 @@ class CommandSearcher:
 
     def __getitem__(self, name):
         return self.find(name)
+
+    def __dir__(self):
+        legal_first_chars = set(string.ascii_letters + '_')
+        legal_chars = set(string.ascii_letters + string.digits + '_')
+        result = []
+        for p in os.environ['PATH'].split(os.pathsep):
+            for i in os.listdir(p):
+                if i[0] in legal_first_chars and set(i) <= legal_chars:
+                    result.append(i)
+        return result
 
 cmd = CommandSearcher()
 
