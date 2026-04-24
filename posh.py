@@ -1,5 +1,6 @@
 import getpass
 import os
+import os.path
 import pathlib
 import socket
 import sys
@@ -37,4 +38,10 @@ fn is a function taking no arguments and returning a string."""
     sys.ps2 = _FnString(fn)
 
 setps1(lambda: f'{user}@{hostname}:{pwd()} >>> ')
+
+parent = Path('..')
+root = Path('/')
+home = Path(os.path.expanduser('~'))
+
+cd = os.chdir
 
