@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 def pwd():
+    "Return the currnet working directory."
     return pathlib.Path(os.getcwd())
 
 user = getpass.getuser()
@@ -21,9 +22,18 @@ class _FnString:
         return self.fn()
 
 def setps1(fn):
+    """Set the primary shell prompt.
+
+fn is a function taking no arguments and returning a string.
+
+For example, the default prompt is set by:
+setps1(lambda: f'{user}@{hostname}:{pwd()} >>> ')"""
     sys.ps1 = _FnString(fn)
 
 def setps2(fn):
+    """Set the secondary shell prompt, which displays when entering multi-line strings.
+
+fn is a function taking no arguments and returning a string."""
     sys.ps2 = _FnString(fn)
 
 setps1(lambda: f'{user}@{hostname}:{pwd()} >>> ')
