@@ -2,6 +2,7 @@ import getpass
 import os
 import os.path
 import pathlib
+import signal
 import socket
 import subprocess
 import sys
@@ -17,6 +18,20 @@ def which(name):
         candidate = os.path.join(p, name)
         if os.path.exists(candidate):
             return candidate
+
+class QuitSignal(Exception):
+    pass
+
+def _raise_quit(signum, frame):
+    raise QuitSignal()
+
+class _TrapSignals:
+    def __enter__(self):
+        if os.name != 'nt':
+            self.prev_quit = signal.signal(signal.SIGQUIT, _raise_quit)
+
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        signal.signal(signal.SIGQUIT, self.prev_quit)
 
 class Command:
     """Object representing a command that can be executed by creating a new process
@@ -95,7 +110,8 @@ _switch_index -- Index in the argument list where switches are inserted. Default
                             argv.insert(switch_index, f'--{converted_name}={v}')
                         switch_index += 1
         popen = subprocess.Popen(argv)
-        retval = popen.wait()
+        with _TrapSignals():
+            retval = popen.wait()
         if retval:
             raise subprocess.CalledProcessError(retval, argv)
 
