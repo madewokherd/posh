@@ -23,8 +23,15 @@ class Command:
 
 Typical operation is to call it with an argument list. A default list of arguments and keyword arguments (typically specifying the name of the command) can be embedded in the object.
 
+Keyword arguments:
+Arguments starting with _ are reserved and may have special meaning.
+Single character keyword arguments are translated to short switches. For example "git commit -a" can be expressed as: cmd.git('commit', a=True). If a value other than True is used, it will be converted to a string and passed as a value.
+Lowercase keyword arguments are translated to long options, with underscores replaced by hyphens. For example "git push --force-with-lease" can be expressed as cmd.git('push', force_with_lease=True). If a value other than True is used, it will be converted to a string and passed as a value. If the switch uses underscores instead of hyphens, this can be expressed by ending the argument with a hyphen, for example "silly_command --why_underscores" can be expressed as cmd.silly_command(why_underscores_=True).
+
 Special keyword arguments:
+_argv -- Specifies the *entire* argument list, including the command name, which will be used without modification.
 _path_safety -- If True, arguments starting with - will be prefixed with the current directory to prevent relative paths from being erroneously interpreted as switches. On Windows, arguments starting with / will also be prefixed. Defaults to True.
+_switch_index -- Index in the argument list where switches are inserted. Defaults to 1.
 """
 
     def __init__(self, *args, **kwargs):
@@ -45,6 +52,7 @@ _path_safety -- If True, arguments starting with - will be prefixed with the cur
 
     def run(self):
         """Run the command as it is"""
+        switch_index = self.kwargs.get('_switch_index', 1)
         if '_argv' in self.kwargs:
             argv = self.kwargs['_argv']
         else:
@@ -66,6 +74,26 @@ _path_safety -- If True, arguments starting with - will be prefixed with the cur
                         if (arg.startswith(b'-') or (os.name == 'nt' and arg.startswith(b'/'))):
                             arg = os.path.join(os.getcwdb(), arg)
                 argv.append(arg)
+            for k, v in self.kwargs.items():
+                if not k.startswith('_'):
+                    if len(k) == 1:
+                        # short switch
+                        if v == True:
+                            argv.insert(switch_index, '-' + k)
+                        else:
+                            argv.insert(switch_index, '-' + k + v)
+                        switch_index += 1
+                    elif k.islower():
+                        # long switch
+                        if k.endswith('_'):
+                            converted_name = k[:-1]
+                        else:
+                            converted_name = k.replace('_', '-')
+                        if v == True:
+                            argv.insert(switch_index, f'--{converted_name}')
+                        else:
+                            argv.insert(switch_index, f'--{converted_name}={v}')
+                        switch_index += 1
         popen = subprocess.Popen(argv)
         retval = popen.wait()
         if retval:
