@@ -6,6 +6,11 @@ import signal
 import socket
 import subprocess
 import sys
+try:
+    import termios
+    _have_termios = True
+except ImportError:
+    _have_termios = False
 
 from pathlib import Path
 
@@ -29,9 +34,17 @@ class _TrapSignals:
     def __enter__(self):
         if os.name != 'nt':
             self.prev_quit = signal.signal(signal.SIGQUIT, _raise_quit)
+        if _have_termios:
+            try:
+                self.prev_tcattr = termios.tcgetattr(sys.stdin)
+            except termios.error:
+                self.prev_tcattr = None
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
-        signal.signal(signal.SIGQUIT, self.prev_quit)
+        if os.name != 'nt':
+            signal.signal(signal.SIGQUIT, self.prev_quit)
+        if _have_termios and self.prev_tcattr:
+            termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, self.prev_tcattr)
 
 class Command:
     """Object representing a command that can be executed by creating a new process
@@ -109,8 +122,8 @@ _switch_index -- Index in the argument list where switches are inserted. Default
                         else:
                             argv.insert(switch_index, f'--{converted_name}={v}')
                         switch_index += 1
-        popen = subprocess.Popen(argv)
         with _TrapSignals():
+            popen = subprocess.Popen(argv)
             retval = popen.wait()
         if retval:
             raise subprocess.CalledProcessError(retval, argv)
