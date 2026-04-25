@@ -197,7 +197,6 @@ class Completer(rlcompleter.Completer):
                 for token in tokenize.tokenize(io.BytesIO(buf[0:error_idx].encode('utf8')).readline):
                     tokens.append(token)
                 tokens.append(buf[error_idx:idx])
-            self.tokens = tokens
             if isinstance(tokens[-1],str) and tokens[-1][0] in ('"', "'") and '\n' not in tokens[-1]:
                 # incomplete string
                 parentdir = tokens[-1][1:].encode('utf8').decode('unicode-escape')
@@ -217,7 +216,7 @@ class Completer(rlcompleter.Completer):
                                 continue
                             result = candidate.encode('unicode-escape').decode('utf8')
                             if stat.S_ISDIR(st.st_mode):
-                                result = result + '/'
+                                result = result + os.sep
                             else:
                                 result = result + tokens[-1][0]
                             self.matches.append(result)
