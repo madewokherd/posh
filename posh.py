@@ -1,9 +1,21 @@
 import getpass
+import io
 import os
 import os.path
 import pathlib
+try:
+    import _pyrepl.main
+    if _pyrepl.main.CAN_USE_PYREPL:
+        from _pyrepl import readline
+    else:
+        import readline
+    _has_readline = True
+except ImportError:
+    _has_readline = False
+import rlcompleter
 import signal
 import socket
+import stat
 import string
 import subprocess
 import sys
@@ -12,6 +24,7 @@ try:
     _have_termios = True
 except ImportError:
     _have_termios = False
+import tokenize
 
 from pathlib import Path
 
@@ -164,6 +177,63 @@ class CommandSearcher:
         return result
 
 cmd = CommandSearcher()
+
+class Completer(rlcompleter.Completer):
+    def __init__(self, namespace=None, prev_completer=None):
+        super().__init__(namespace)
+        self.prev_completer = prev_completer
+
+    def complete(self, text, state):
+        if state == 0:
+            # figure out if we're completing a path
+            idx = readline.get_begidx()
+            buf = readline.get_line_buffer()
+            tokens = []
+            try:
+                for token in tokenize.tokenize(io.BytesIO(buf[:idx].encode('utf8')).readline):
+                    tokens.append(token)
+            except tokenize.TokenError as e:
+                error_idx = e.args[1][1] - 1
+                for token in tokenize.tokenize(io.BytesIO(buf[0:error_idx].encode('utf8')).readline):
+                    tokens.append(token)
+                tokens.append(buf[error_idx:idx])
+            self.tokens = tokens
+            if isinstance(tokens[-1],str) and tokens[-1][0] in ('"', "'") and '\n' not in tokens[-1]:
+                # incomplete string
+                parentdir = tokens[-1][1:].encode('utf8').decode('unicode-escape')
+                # TODO: handle Path / operator
+                try:
+                    candidates = os.listdir(parentdir)
+                except Exception, e:
+                    pass
+                else:
+                    prefix = text.encode('utf8').decode('unicode-escape')
+                    self.matches = []
+                    for candidate in candidates:
+                        if candidate.startswith(prefix):
+                            try:
+                                st = os.lstat(os.path.join(parentdir, candidate))
+                            except Exception, e:
+                                continue
+                            result = candidate.encode('unicode-escape').decode('utf8')
+                            if stat.S_ISDIR(st.st_mode):
+                                result = result + '/'
+                            else:
+                                result = result + tokens[-1][0]
+                            self.matches.append(result)
+                    if self.matches:
+                        return self.matches[0]
+
+        if self.prev_completer:
+            return self.prev_completer(text, state)
+        return super().complete(text, state)
+
+if _has_readline:
+    readline.RLCompleter = Completer # in case we're imported too early for _pyrepl.readline.set_completer to work
+    if readline.get_completer():
+        readline.set_completer(Completer(prev_completer=readline.get_completer().complete))
+    else:
+        readline.set_completer(Completer())
 
 def pwd():
     "Return the currnet working directory."
